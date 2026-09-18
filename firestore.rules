@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isGlobalAdmin() {
+      return request.auth != null
+        && request.auth.token.email == "admin@gmail.com";
+    }
+
+    // Perfil exclusivo do Administrador Global.
+    // O UID do documento deve ser o UID da conta Firebase Auth.
+    match /administradoresGlobais/{uid} {
+      allow read: if isGlobalAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create: if isGlobalAdmin() && request.auth.uid == uid;
+      allow update: if isGlobalAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "estado"]);
+      allow delete: if false;
+    }
+
+    // Dados consultados e geridos exclusivamente pelo painel global.
+    match /agentes/{uid} {
+      allow read: if isGlobalAdmin();
+      allow update: if isGlobalAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "estado"]);
+      allow create, delete: if false;
+    }
+
+    match /moradores/{uid} {
+      allow read: if isGlobalAdmin();
+      allow update: if isGlobalAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "estado"]);
+      allow create, delete: if false;
+    }
+
+    // As restantes regras existentes do projecto devem continuar aqui.
+    // Não substitua regras operacionais sem as migrar para este ficheiro.
+  }
+}
