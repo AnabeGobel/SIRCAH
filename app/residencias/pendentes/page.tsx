@@ -126,7 +126,7 @@ export default function PendentesPage() {
   return (
     <div className="flex h-screen bg-background">
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
+        <header className="page-shell-header h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
           <div className="hidden sm:flex items-center gap-4">
             <h1 className="text-xl font-semibold text-foreground whitespace-nowrap">
               Registos Pendentes

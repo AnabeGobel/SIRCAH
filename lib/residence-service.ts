@@ -31,6 +31,9 @@ export interface Residencia {
   motivoRejeicao?: string
   estadoResidencia?: EstadoResidencia
   mensagemEstado?: string
+  comentarioJustificativa?: string
+  comprovativoNome?: string
+  comprovativoUrl?: string
   justificativaReenvio?: string
   anexoJustificacao?: string
 }
@@ -77,8 +80,11 @@ const converterDoc = (id: string, data: any): Residencia => ({
   motivoRejeicao: data.motivoRejeicao ?? "",
   estadoResidencia: data.estadoResidencia ?? "valido",
   mensagemEstado: data.mensagemEstado ?? "",
-  justificativaReenvio: data.justificativaReenvio ?? data.justificativa ?? data.mensagemReenvio ?? data.justificativaEdicao ?? "",
-  anexoJustificacao: data.anexoJustificacao ?? data.documentoJustificacao ?? data.imagemJustificacao ?? data.justificativaArquivo ?? data.comprovativoReenvio ?? "",
+  comentarioJustificativa: data.comentarioJustificativa ?? data.justificativa?.comentarioJustificativa ?? "",
+  comprovativoNome: data.comprovativoNome ?? data.justificativa?.comprovativoNome ?? "",
+  comprovativoUrl: data.comprovativoUrl ?? data.justificativa?.comprovativoUrl ?? "",
+  justificativaReenvio: data.comentarioJustificativa ?? data.justificativa?.comentarioJustificativa ?? data.justificativaReenvio ?? data.justificativaTexto ?? data.mensagemReenvio ?? data.justificativaEdicao ?? (typeof data.justificativa === "string" ? data.justificativa : "") ?? "",
+  anexoJustificacao: data.comprovativoUrl ?? data.justificativa?.comprovativoUrl ?? data.anexoJustificacao ?? data.documentoJustificacao ?? data.imagemJustificacao ?? data.justificativaArquivo ?? data.comprovativoReenvio ?? "",
 })
 
 // ─── Função principal ─────────────────────────────────────────────────────────

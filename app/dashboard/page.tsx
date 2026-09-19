@@ -9,13 +9,14 @@ import { ResidencesTable, type Residence } from "@/components/residences-table"
 import { ResidenceDetailPanel } from "@/components/residence-detail-panel"
 import { QRCodeModal } from "@/components/qr-code-modal"
 import { RejectModal } from "@/components/reject-modal"
+import { JustificationDetailsModal } from "@/components/justification-details-modal"
 import { 
   buscarResidencias, 
   aprovarResidencia, 
   rejeitarResidencia 
 } from "@/lib/residencia/residenciaService"
-import { obterAnexoJustificacao, obterJustificativaReenvio } from "@/lib/residencia/residenciaService"
-import { Bell, Search, Loader2, CheckCircle2, XCircle, FilePlus, ChevronRight, MapPin, Activity } from "lucide-react"
+import { obterAnexoJustificacao, obterJustificativaReenvio, obterNomeComprovativo } from "@/lib/residencia/residenciaService"
+import { Bell, Search, Loader2, CheckCircle2, XCircle, FilePlus, ChevronRight, MapPin, Activity, MessageSquare, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -45,7 +46,9 @@ export default function DashboardPage() {
   const [selectedResidence, setSelectedResidence] = useState<Residence | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
+  const [showJustificationModal, setShowJustificationModal] = useState(false)
   const [pendingAction, setPendingAction] = useState<Residence | null>(null)
+  const [selectedJustification, setSelectedJustification] = useState<Residence | null>(null)
   const [generatedCode, setGeneratedCode] = useState<string>("")
 
   // ── Estados do Popover de Notificações ──────────────────────────────────────
@@ -82,9 +85,13 @@ export default function DashboardPage() {
           lat: d.coordenadas?.latitude ?? d.coordenadas?.lat ?? -12.77,
           lng: d.coordenadas?.longitude ?? d.coordenadas?.lng ?? 15.73
         },
-        foto: d.foto || d.imagem_url || "",
+        foto_url: d.foto || d.foto_url || d.imagem_url || "",
         codigo: d.codigo || "",
         contacto: d.contacto || "-"
+        , motivoRejeicao: d.motivoRejeicao || ""
+        , comentarioJustificativa: obterJustificativaReenvio(d)
+        , comprovativoNome: obterNomeComprovativo(d)
+        , comprovativoUrl: d.comprovativoUrl || ""
         , justificativaReenvio: obterJustificativaReenvio(d)
         , anexoJustificacao: obterAnexoJustificacao(d)
       }))
@@ -160,6 +167,7 @@ export default function DashboardPage() {
   }
 
   const pendingResidences = residences.filter((r) => r.status === "pendente")
+  const justificationResidences = residences.filter((r) => r.justificativaReenvio || r.anexoJustificacao)
 
   const bairros = residences.reduce<Record<string, number>>((acc, residence) => {
     const bairro = residence.bairro || "Sem bairro"
@@ -236,7 +244,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-screen bg-background">
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
+        <header className="page-shell-header h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
           <div className="hidden sm:flex items-center gap-4">
             <h1 className="text-xl font-semibold text-foreground whitespace-nowrap">Dashboard</h1>
           </div>
@@ -276,6 +284,45 @@ export default function DashboardPage() {
                       {notificacoes.length} recentes
                     </span>
                   </div>
+
+                  {justificationResidences.length > 0 && (
+                    <div className="border-b border-border bg-status-pending/5">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div>
+                          <h3 className="text-xs font-semibold text-foreground">Justificativas dos moradores</h3>
+                          <p className="text-[10px] text-muted-foreground">Reenvios aguardando consulta da equipa</p>
+                        </div>
+                        <span className="rounded-full bg-status-pending/10 px-2 py-0.5 text-[10px] font-medium text-status-pending">
+                          {justificationResidences.length}
+                        </span>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y divide-border/70">
+                        {justificationResidences.slice(0, 5).map((residence) => (
+                          <button
+                            key={`justification-${residence.id}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedJustification(residence)
+                              setShowJustificationModal(true)
+                              setNotificationsOpen(false)
+                            }}
+                            className="flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                          >
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-status-pending/10 text-status-pending">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium text-foreground">{residence.proprietario}</p>
+                              <p className="truncate text-[10px] text-muted-foreground">{residence.codigo || residence.bairro || "Residência sem código"}</p>
+                              <p className="mt-0.5 line-clamp-1 text-[11px] text-foreground/80">{residence.justificativaReenvio || "Anexo enviado sem comentário"}</p>
+                            </div>
+                            {residence.anexoJustificacao && <Paperclip className="h-3.5 w-3.5 shrink-0 text-primary" aria-label="Possui anexo" />}
+                            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="max-h-[360px] overflow-y-auto divide-y divide-border">
                     {notificacoes.length > 0 ? (
@@ -341,7 +388,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div data-dashboard-content className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-6">
               <div>
@@ -475,6 +522,15 @@ export default function DashboardPage() {
           residenceCode={pendingAction.codigo || pendingAction.id}
         />
       )}
+
+      <JustificationDetailsModal
+        isOpen={showJustificationModal}
+        residence={selectedJustification}
+        onClose={() => {
+          setShowJustificationModal(false)
+          setSelectedJustification(null)
+        }}
+      />
     </div>
   )
 }

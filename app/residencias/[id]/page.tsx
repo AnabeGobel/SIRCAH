@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, MapPin, Phone, User, Calendar, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import dynamic from "next/dynamic"
+import { QRCodeSVG } from "qrcode.react"
+import { ArrowLeft, MapPin, Phone, User, Calendar, CheckCircle, XCircle, Loader2, Clock3, FileText, ImageIcon, Satellite, Map as MapIcon, Hash, Navigation } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 import { StatusBadge } from "@/components/status-badge"
@@ -12,7 +14,9 @@ import { RejectModal } from "@/components/reject-modal"
 import { db } from "@/lib/Services/firebaseConfig"
 import { doc, getDoc } from "firebase/firestore"
 import { rejeitarResidencia } from "@/lib/residencia/residenciaService"
-import { obterAnexoJustificacao } from "@/lib/residencia/residenciaService"
+import { obterAnexoJustificacao, obterJustificativaReenvio, obterNomeComprovativo } from "@/lib/residencia/residenciaService"
+
+const MapaReal = dynamic(() => import("@/components/mapa-real"), { ssr: false })
 
 export default function ResidenceReviewPage() {
   const params = useParams()
@@ -21,6 +25,7 @@ export default function ResidenceReviewPage() {
   const [loading, setLoading] = useState(true)
   const [showQRModal, setShowQRModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
+  const [modoSatélite, setModoSatélite] = useState(false)
 
   // Carregar dados reais do documento específico
   useEffect(() => {
@@ -56,8 +61,13 @@ export default function ResidenceReviewPage() {
             endereco: dados.endereco || "Endereço não disponível",
             bairro: dados.bairro || "Huambo",
             dataRegisto: dados.dataRegisto || "Data não registada",
+            contacto: dados.telefone || dados.contacto || "Não informado",
+            atualizadoEm: dados.atualizadoEm || dados.updatedAt || dados.editadoEm || dados.rejeitadoEm || dados.aprovadoEm || null,
+            qr_code_url: dados.qr_code_url || "",
             status: dados.status || "pendente"
-            , justificativaReenvio: dados.justificativaReenvio || dados.justificativa || dados.mensagemReenvio || dados.justificativaEdicao || ""
+            , comentarioJustificativa: obterJustificativaReenvio(dados)
+            , comprovativoNome: obterNomeComprovativo(dados)
+            , justificativaReenvio: obterJustificativaReenvio(dados)
             , anexoJustificacao: obterAnexoJustificacao(dados)
           })
         }
@@ -125,138 +135,126 @@ const formatarData = (data: any) => {
   
   // Se for um Timestamp do Firebase (objeto com seconds)
   if (data.seconds) {
-    return new Date(data.seconds * 1000).toLocaleDateString("pt-PT");
+    return new Date(data.seconds * 1000).toLocaleString("pt-PT", { dateStyle: "medium", timeStyle: "short" });
   }
   
   // Se já for string ou Date
   return String(data);
 };
 
+  const residenciaParaMapa = {
+    id: residence.id,
+    bairro: residence.bairro || "",
+    codigo: residence.codigo || "",
+    coordenadas: residence.coordenadas,
+    criadoEm: null,
+    descricao: residence.descricao || "",
+    foto_url: residence.foto_url || "",
+    nome_morador: residence.proprietario || "",
+    rua: residence.rua || "",
+    telefone: residence.contacto || "",
+    status: residence.status,
+  }
+
   return (
-    <div className="flex min-h-screen bg-background">
-  
-
-      <main className="flex-1 p-8 overflow-auto pb-24">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="h-10 w-10 p-0 rounded-xl hover:bg-muted"
-          >
+    <>
+      <main className="min-h-full overflow-auto bg-background p-4 pb-28 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="page-shell-header -mx-4 -mt-4 flex items-center gap-4 border-b border-border bg-card px-4 py-4 sm:-mx-6 sm:-mt-6 sm:px-6 lg:-mx-8 lg:-mt-8 lg:px-8">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="h-10 w-10 shrink-0 rounded-xl p-0 hover:bg-muted">
             <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Voltar</span>
           </Button>
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Revisão Técnica</h1>
-            <p className="text-sm text-muted-foreground mt-1 uppercase tracking-tighter">
-              ID: {residence.id} | {residence.bairro || "Huambo"}
-            </p>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold text-foreground">Detalhes da residência</h1>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{residence.proprietario} · {residence.bairro || "Huambo"}</p>
           </div>
-        </div>
+          <div className="ml-auto shrink-0"><StatusBadge status={residence.status} /></div>
+        </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Coluna Esquerda - Dados */}
-          <div className="lg:col-span-3 space-y-6">
-            <div className="bg-card rounded-[24px] border border-border p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Dados da Identificação</h2>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Estado Atual</p>
-                  <StatusBadge status={residence.status} />
-                </div>
-                <div className="space-y-1 text-right">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Código Alfanumérico</p>
-                  <p className="text-sm font-mono font-bold text-primary">{residence.codigo || "Pendente"}</p>
-                </div>
-                <div className="space-y-1 col-span-2 border-t pt-4">
-                  <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1 font-bold">
-                    <User className="h-3 w-3" /> Titular da Residência
-                  </p>
-                  <p className="text-lg font-medium text-foreground">{residence.proprietario}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1 font-bold">
-                    <MapPin className="h-3 w-3" /> Endereço/Bairro
-                  </p>
-                  <p className="text-sm text-foreground">{residence.bairro}, {residence.rua}</p>
-                </div>
-                <div className="space-y-1 text-right">
-                  <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1 justify-end font-bold">
-                    <Calendar className="h-3 w-3" /> Data de Captura
-                  </p>
-                  <p className="text-sm text-foreground">{formatarData(residence.criadoEm)}</p>
-                </div>
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,0.6fr)]">
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="rounded-xl bg-primary/10 p-2 text-primary"><User className="h-5 w-5" /></div>
+                <div><h2 className="text-lg font-semibold text-foreground">Identificação e contacto</h2><p className="text-sm text-muted-foreground">Dados principais do titular e da residência</p></div>
               </div>
-            </div>
+              <dl className="grid gap-5 sm:grid-cols-2">
+                <div><dt className="text-xs font-medium text-muted-foreground">Titular</dt><dd className="mt-1 text-sm font-semibold text-foreground">{residence.proprietario}</dd></div>
+                <div><dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Phone className="h-3.5 w-3.5" /> Telefone</dt><dd className="mt-1 text-sm text-foreground">{residence.contacto || "Não informado"}</dd></div>
+                <div><dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> Morada</dt><dd className="mt-1 text-sm text-foreground">{[residence.endereco, residence.bairro, residence.rua].filter(Boolean).join(", ") || "Não informada"}</dd></div>
+                <div><dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Hash className="h-3.5 w-3.5" /> Código</dt><dd className="mt-1 font-mono text-sm font-semibold text-primary">{residence.codigo || "Pendente"}</dd></div>
+              </dl>
+            </section>
 
-            {/* Foto Real */}
-            <div className="bg-card rounded-[24px] border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Evidência Fotográfica</h2>
-              <div className="aspect-video rounded-[20px] bg-muted overflow-hidden border border-border">
-                {/* CORREÇÃO: Usando o campo correto que vem do mapeamento (foto) */}
-                {residence.foto_url ? (
-                  <img src={residence.foto_url} className="w-full h-full object-cover" alt="Residência" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                    <p>Nenhuma foto enviada pelo agente</p>
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-blue-500/10 p-2 text-blue-600"><Clock3 className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">Estado e datas</h2><p className="text-sm text-muted-foreground">Histórico temporal do registo</p></div></div>
+              <dl className="grid gap-5 sm:grid-cols-3">
+                <div><dt className="text-xs font-medium text-muted-foreground">Estado atual</dt><dd className="mt-2"><StatusBadge status={residence.status} /></dd></div>
+                <div><dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Calendar className="h-3.5 w-3.5" /> Criada em</dt><dd className="mt-1 text-sm text-foreground">{formatarData(residence.criadoEm)}</dd></div>
+                <div><dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground"><Clock3 className="h-3.5 w-3.5" /> Atualizada em</dt><dd className="mt-1 text-sm text-foreground">{formatarData(residence.atualizadoEm)}</dd></div>
+              </dl>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><ImageIcon className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">Foto da residência</h2><p className="text-sm text-muted-foreground">Evidência visual submetida no registo</p></div></div></div>
+              <div className="aspect-video overflow-hidden rounded-xl border border-border bg-muted/40">{residence.foto_url ? <img src={residence.foto_url} className="h-full w-full object-cover" alt="Foto da residência" /> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Nenhuma foto enviada</div>}</div>
+            </section>
+          </div>
+
+          <div className="space-y-6">
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <div className="mb-4 flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><MapIcon className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">Localização da residência</h2><p className="text-sm text-muted-foreground">Posição geográfica registada</p></div></div>
+              <div className="mb-3 flex items-center justify-between gap-2"><p className="flex items-center gap-1 text-xs text-muted-foreground"><Navigation className="h-3.5 w-3.5" /> {residence.coordenadas.lat.toFixed(6)}, {residence.coordenadas.lng.toFixed(6)}</p><div className="flex rounded-lg border border-border p-0.5"><Button type="button" variant={!modoSatélite ? "secondary" : "ghost"} size="sm" className="h-8 px-2 text-xs" onClick={() => setModoSatélite(false)}><MapIcon className="mr-1 h-3.5 w-3.5" /> Mapa</Button><Button type="button" variant={modoSatélite ? "secondary" : "ghost"} size="sm" className="h-8 px-2 text-xs" onClick={() => setModoSatélite(true)}><Satellite className="mr-1 h-3.5 w-3.5" /> Satélite</Button></div></div>
+              <div className="h-72 overflow-hidden rounded-xl border border-border"><MapaReal residencias={[residenciaParaMapa]} selectedResidence={residenciaParaMapa} onSelectResidence={() => undefined} modoSatélite={modoSatélite} /></div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><Hash className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">QR Code</h2><p className="text-sm text-muted-foreground">Código de identificação da residência</p></div></div><div className="flex items-center justify-center rounded-xl border border-border bg-white p-5"><QRCodeSVG value={residence.codigo || residence.id} size={180} level="H" /></div><p className="mt-3 text-center font-mono text-xs text-muted-foreground">{residence.codigo || residence.id}</p></section>
+
+            <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="mb-4 flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">Rastreabilidade</h2><p className="text-sm text-muted-foreground">Eventos registados no processo</p></div></div><Timeline events={realTimeline} /></section>
+
+            {residence.status === "rejeitada" && (residence.motivoRejeicao || residence.justificativaReenvio || residence.anexoJustificacao) && (
+              <section className="rounded-2xl border border-status-rejected/30 bg-status-rejected/5 p-5 sm:p-6">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-xl bg-status-rejected/10 p-2 text-status-rejected"><FileText className="h-5 w-5" /></div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-status-rejected">Justificativa da rejeição</h2>
+                    <p className="text-sm text-muted-foreground">Comentário e comprovativo enviados pelo morador</p>
+                  </div>
+                </div>
+                {residence.motivoRejeicao && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-muted-foreground">Motivo da rejeição</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">{residence.motivoRejeicao}</p>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Coluna Direita - Mapa e Timeline */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-card rounded-[24px] border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Geolocalização</h2>
-              <div className="aspect-square rounded-[16px] bg-muted overflow-hidden relative border border-border">
-                {/* Aqui você pode integrar o Google Maps real depois */}
-                <div className="absolute inset-0 bg-slate-200 flex items-center justify-center">
-                   <div className="text-center p-4">
-                     <MapPin className="h-8 w-8 text-primary mx-auto mb-2" />
-                     <p className="text-[10px] font-bold">LAT: {residence.coordenadas.lat}</p>
-                     <p className="text-[10px] font-bold">LNG: {residence.coordenadas.lng}</p>
-                   </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Comentário da justificativa</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">{residence.justificativaReenvio || "O morador não enviou um comentário."}</p>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-[24px] border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Rastreabilidade</h2>
-              <Timeline events={realTimeline} />
-            </div>
-
-            {residence.status === "rejeitada" && residence.motivoRejeicao && (
-              <div className="bg-status-rejected/5 rounded-[24px] border border-status-rejected/20 p-6">
-                <h2 className="text-lg font-semibold text-status-rejected mb-2">Motivo da rejeição</h2>
-                <p className="text-sm leading-6 text-foreground">{residence.motivoRejeicao}</p>
-              </div>
-            )}
-
-            {(residence.justificativaReenvio || residence.anexoJustificacao) && (
-              <div className="bg-status-pending/5 rounded-[24px] border border-status-pending/20 p-6">
-                <h2 className="text-lg font-semibold text-status-pending mb-2">Justificativa do novo envio</h2>
-                {residence.justificativaReenvio && <p className="text-sm leading-6 text-foreground">{residence.justificativaReenvio}</p>}
                 {residence.anexoJustificacao && (
                   <div className="mt-4 rounded-xl border border-border bg-background p-3">
-                    {residence.anexoJustificacao.startsWith("data:image/") || /\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(residence.anexoJustificacao) ? (
-                      <img src={residence.anexoJustificacao} alt="Imagem da justificação" className="max-h-72 w-full rounded-lg object-contain" />
+                    {residence.anexoJustificacao.startsWith("data:image/") || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(`${residence.comprovativoNome || ""} ${residence.anexoJustificacao}`) ? (
+                      <img src={residence.anexoJustificacao} alt={residence.comprovativoNome || "Comprovativo"} className="max-h-72 w-full rounded-lg object-contain" />
                     ) : (
-                      <a href={residence.anexoJustificacao} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
-                        Abrir documento de justificação
+                      <a href={residence.anexoJustificacao} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                        <FileText className="h-4 w-4" />
+                        {residence.comprovativoNome || "Abrir comprovativo"}
                       </a>
                     )}
+                    {residence.comprovativoNome && <p className="mt-2 truncate text-xs text-muted-foreground">{residence.comprovativoNome}</p>}
                   </div>
                 )}
-              </div>
+              </section>
             )}
           </div>
-        </div>
+        </section>
+
+      </div>
 
         {/* Barra de Ações Fixa */}
         {residence.status === "pendente" && (
-          <div className="fixed bottom-0 left-64 right-0 bg-card/80 backdrop-blur-md border-t border-border p-4 z-50">
+          <div className="residence-action-bar fixed bottom-0 left-0 right-0 bg-card/80 backdrop-blur-md border-t border-border p-4 z-50">
             <div className="max-w-5xl mx-auto flex justify-end gap-4">
               <Button variant="outline" onClick={handleReject} className="rounded-xl border-status-rejected text-status-rejected">
                 <XCircle className="h-4 w-4 mr-2" /> Rejeitar
@@ -285,6 +283,6 @@ const formatarData = (data: any) => {
         onConfirm={handleConfirmReject}
         residenceCode={residence.id}
       />
-    </div>
+    </>
   )
 }

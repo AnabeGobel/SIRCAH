@@ -20,7 +20,7 @@ export interface Residence {
   endereco: string
   bairro: string
   rua: string;
-  criadoEm: string
+  criadoEm: unknown
   status: "pendente" | "aprovado" | "rejeitada"
   coordenadas: { lat: number; lng: number }
   foto_url?: string
@@ -28,6 +28,10 @@ export interface Residence {
   contacto?: string;
   estadoResidencia?: "valido" | "invalido";
   mensagemEstado?: string;
+  motivoRejeicao?: string;
+  comentarioJustificativa?: string;
+  comprovativoNome?: string;
+  comprovativoUrl?: string;
   justificativaReenvio?: string;
   anexoJustificacao?: string;
 }

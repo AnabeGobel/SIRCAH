@@ -7,6 +7,10 @@ service cloud.firestore {
         && request.auth.token.email == "admin@gmail.com";
     }
 
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     // Perfil exclusivo do Administrador Global.
     // O UID do documento deve ser o UID da conta Firebase Auth.
     match /administradoresGlobais/{uid} {
@@ -26,10 +30,16 @@ service cloud.firestore {
     }
 
     match /moradores/{uid} {
-      allow read: if isGlobalAdmin();
+      allow read: if isAuthenticated();
       allow update: if isGlobalAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "estado"]);
       allow create, delete: if false;
+    }
+
+    // Operação de residências para utilizadores autenticados do sistema.
+    match /residencias/{residenciaId} {
+      allow read, create, update: if isAuthenticated();
+      allow delete: if false;
     }
 
     // As restantes regras existentes do projecto devem continuar aqui.

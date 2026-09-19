@@ -3,10 +3,11 @@
 import { useState } from "react"
 import { usePathname } from "next/navigation" // 👈 Importamos o hook para ler a rota atual
 import { Sidebar } from "@/components/sidebar"
-import { Menu, X, Home } from "lucide-react"
+import { Menu, X, Home, PanelLeftOpen, PanelLeftClose } from "lucide-react"
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const pathname = usePathname() // 👈 Guarda a rota atual (ex: "/login", "/dashboard", "/bem-vindo")
 
   // 🌍 DEFINIÇÃO DE ROTAS PÚBLICAS
@@ -24,7 +25,11 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
 
   // 🔐 CASO CONTRÁRIO: Renderiza a estrutura completa do Dashboard Responsivo
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-background text-foreground">
+    <div
+      data-app-shell
+      data-sidebar-collapsed={isSidebarCollapsed}
+      className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-background text-foreground ${isSidebarCollapsed ? "sidebar-collapsed" : "sidebar-open"}`}
+    >
       
       {/* BARRA SUPERIOR MOBILE - Só visível em telemóveis */}
       <header className="flex md:hidden items-center justify-between px-4 py-3 bg-sidebar border-b border-sidebar-border h-16 shrink-0 z-50 w-full">
@@ -54,17 +59,30 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
 
       {/* CONTENDOR DA SIDEBAR COM CORREÇÃO DE POSICIONAMENTO FIXO NO MOBILE */}
       <div className={`
-        fixed inset-y-0 left-0 z-40 w-64 transform bg-sidebar transition-transform duration-300 ease-in-out 
-        md:relative md:transform-none md:flex shrink-0 h-full
-        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        fixed left-0 top-0 bottom-0 z-40 transform bg-sidebar transition-[width,transform] duration-300 ease-in-out
+        md:flex md:transition-transform md:duration-200 shrink-0
+        ${isMobileMenuOpen ? "translate-x-0 w-64" : isSidebarCollapsed ? "translate-x-0 w-16 md:w-16" : "-translate-x-full w-64 md:translate-x-0 md:w-64"}
       `}>
         <div className="w-full h-full flex flex-col" onClick={() => setIsMobileMenuOpen(false)}>
-          <Sidebar />
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            onNavigate={() => setIsMobileMenuOpen(false)}
+          />
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+        className={`fixed top-24 z-50 hidden rounded-lg border border-border bg-card p-2 text-foreground shadow-sm transition-[left,background-color] hover:bg-muted md:block ${isSidebarCollapsed ? "left-[calc(4rem-1.25rem)]" : "left-[calc(16rem-1.25rem)]"}`}
+        aria-label={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
+        title={isSidebarCollapsed ? "Abrir menu lateral" : "Fechar menu lateral"}
+      >
+        {isSidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+      </button>
+
       {/* CONTEÚDO PRINCIPAL COM SCROLL INDEPENDENTE */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
+      <main className="flex-1 min-w-0 overflow-y-auto w-full">
         {children}
       </main>
     </div>

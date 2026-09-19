@@ -26,11 +26,27 @@ export interface ResidencialDoc extends DocumentData {
   editadoEm?: unknown;
 }
 
+const obterCampoJustificativa = (dados: Record<string, any>, campo: string) => {
+  const fontes = [
+    dados,
+    dados.justificativa,
+    dados.justificacao,
+    dados.reenvio,
+    dados.justificativaReenvio,
+    dados.dadosJustificativa,
+  ]
+
+  return fontes.find((fonte) => fonte && typeof fonte === "object" && fonte[campo])?.[campo] || ""
+}
+
 export const obterJustificativaReenvio = (dados: Record<string, any>) =>
-  dados.justificativaReenvio || dados.justificativa || dados.mensagemReenvio || dados.justificativaEdicao || "";
+  obterCampoJustificativa(dados, "comentarioJustificativa") || dados.justificativaReenvio || dados.justificativaTexto || dados.mensagemReenvio || dados.justificativaEdicao || (typeof dados.justificativa === "string" ? dados.justificativa : "") || "";
 
 export const obterAnexoJustificacao = (dados: Record<string, any>) =>
-  dados.anexoJustificacao || dados.documentoJustificacao || dados.imagemJustificacao || dados.justificativaArquivo || dados.comprovativoReenvio || "";
+  obterCampoJustificativa(dados, "comprovativoUrl") || dados.comprovativoUrl || dados.anexoJustificacao || dados.documentoJustificacao || dados.imagemJustificacao || dados.justificativaArquivo || dados.comprovativoReenvio || "";
+
+export const obterNomeComprovativo = (dados: Record<string, any>) =>
+  obterCampoJustificativa(dados, "comprovativoNome") || dados.comprovativoNome || "";
 
 // ─────────────────────────────────────────────
 // Buscar residências pelo status

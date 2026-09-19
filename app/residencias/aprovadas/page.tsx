@@ -66,7 +66,7 @@ const carregarAprovadas = async () => {
      
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header */}
-       <header className="h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
+      <header className="page-shell-header h-16 border-b border-border bg-card px-4 sm:px-6 flex items-center justify-between gap-4 w-full">
   {/* Lado Esquerdo: Título e Contador (Badge) */}
   {/* Oculto no mobile (hidden) e visível a partir de computadores (sm:flex) */}
   <div className="hidden sm:flex items-center gap-4">

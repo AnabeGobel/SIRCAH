@@ -417,7 +417,7 @@ export default function ConfiguracoesPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-background gap-2">
+      <div className="flex h-screen w-full items-center justify-center bg-background gap-2">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
         <span className="text-sm text-muted-foreground">A carregar configurações...</span>
       </div>
@@ -427,7 +427,7 @@ export default function ConfiguracoesPage() {
   return (
     <div className="flex h-screen bg-background text-foreground">
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+        <header className="page-shell-header h-16 border-b border-border bg-card px-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-semibold text-foreground">Configurações</h1>
           </div>

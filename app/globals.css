@@ -136,3 +136,35 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media (min-width: 768px) {
+  [data-app-shell].sidebar-open > main {
+    width: calc(100% - 16rem);
+    margin-left: 16rem;
+  }
+
+  [data-app-shell].sidebar-collapsed > main {
+    width: calc(100% - 4rem);
+    margin-left: 4rem;
+  }
+
+  [data-app-shell] .page-shell-header {
+    padding-left: 1.5rem !important;
+  }
+
+  [data-app-shell].sidebar-open > main .page-shell-header {
+    padding-left: 1.5rem !important;
+  }
+
+  [data-app-shell].sidebar-collapsed > main .page-shell-header {
+    padding-left: 1.5rem !important;
+  }
+
+  [data-app-shell].sidebar-open .residence-action-bar {
+    left: 16rem;
+  }
+
+  [data-app-shell].sidebar-collapsed .residence-action-bar {
+    left: 4rem;
+  }
+}
