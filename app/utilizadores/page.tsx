@@ -43,8 +43,11 @@ export default function UsersPage() {
 
   useEffect(() => {
     let unsubscribeProfile: () => void = () => {}
+    let unsubscribeUsers: () => void = () => {}
 
     const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+      unsubscribeProfile()
+      unsubscribeUsers()
       if (!currentUser) {
         setIsAdmin(false)
         setIsLoading(false)
@@ -63,20 +66,22 @@ export default function UsersPage() {
       })
     })
 
-    const unsubscribeUsers = onSnapshot(collection(db, "usuariosWeb"), (snapshot) => {
-      setUsers(snapshot.docs.map((doc) => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          nome: data.nome || "",
-          email: data.email || "",
-          telefone: data.telefone || "",
-          funcao: data.funcao || "visualizador",
-          ultimoAcesso: data.ultimoAcesso || "Nunca",
-          estado: data.estado || "ativo",
-        } as User
-      }))
-    }, (error) => console.error("Erro ao listar utilizadores:", error))
+      unsubscribeUsers = onSnapshot(collection(db, "usuariosWeb"), (snapshot) => {
+        setUsers(snapshot.docs.map((doc) => {
+          const data = doc.data()
+          return {
+            id: doc.id,
+            nome: data.nome || "",
+            email: data.email || "",
+            telefone: data.telefone || "",
+            funcao: data.funcao || "visualizador",
+            ultimoAcesso: data.ultimoAcesso || "Nunca",
+            estado: data.estado || "ativo",
+          } as User
+        }))
+      }, (error) => {
+        if (auth.currentUser) console.error("Erro ao listar utilizadores:", error)
+      })
 
     return () => {
       unsubscribeAuth()

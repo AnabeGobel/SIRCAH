@@ -26,6 +26,7 @@ export default function PendentesPage() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [pendingAction, setPendingAction] = useState<Residence | null>(null)
   const [generatedCode, setGeneratedCode] = useState<string>("")
+  const [searchTerm, setSearchTerm] = useState("")
 
   const carregarResidencias = async () => {
     try {
@@ -48,6 +49,8 @@ export default function PendentesPage() {
           foto_url: d.foto_url || d.foto || "",
           codigo: d.codigo || "",
           contacto: d.telefone || d.contacto || "",
+          documentoBi: d.documentoBi,
+          documentosOpcionais: Array.isArray(d.documentosOpcionais) ? d.documentosOpcionais : [],
           justificativaReenvio: obterJustificativaReenvio(d),
           anexoJustificacao: obterAnexoJustificacao(d),
         }))
@@ -62,6 +65,15 @@ export default function PendentesPage() {
   useEffect(() => {
     carregarResidencias()
   }, [])
+
+  const normalizarPesquisa = (valor: string) =>
+    valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const termoPesquisa = normalizarPesquisa(searchTerm.trim())
+  const residencesFiltradas = residences.filter((residence) => {
+    if (!termoPesquisa) return true
+    return [residence.codigo, residence.bairro, residence.proprietario, residence.id]
+      .some((campo) => normalizarPesquisa(campo || "").includes(termoPesquisa))
+  })
 
   const handleView = (r: Residence) => setSelectedResidence(r)
 
@@ -143,6 +155,8 @@ export default function PendentesPage() {
               <input
                 type="text"
                 placeholder="Pesquisar..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="h-10 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -163,12 +177,12 @@ export default function PendentesPage() {
               </div>
             )}
 
-            {!loading && residences.length > 0 && (
+            {!loading && residencesFiltradas.length > 0 && (
               <div className="rounded-2xl bg-status-pending/10 border border-status-pending/20 p-4">
                 <p className="text-sm text-foreground">
                   <strong>Atenção:</strong> Existem{" "}
                   <span className="font-semibold text-status-pending">
-                    {residences.length} residências
+                    {residencesFiltradas.length} residências
                   </span>{" "}
                   aguardando revisão.
                 </p>
@@ -180,9 +194,9 @@ export default function PendentesPage() {
                 <Loader2 className="h-8 w-8 animate-spin mb-2" />
                 <p>A carregar...</p>
               </div>
-            ) : residences.length > 0 ? (
+            ) : residencesFiltradas.length > 0 ? (
               <ResidencesTable
-                residences={residences}
+                residences={residencesFiltradas}
                 onView={handleView}
                 onApprove={handleApprove}
                 onReject={handleReject}
@@ -192,8 +206,8 @@ export default function PendentesPage() {
                 <div className="mx-auto w-16 h-16 rounded-full bg-status-approved/10 flex items-center justify-center mb-4">
                   <span className="text-2xl">🎉</span>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground">Tudo em dia!</h3>
-                <p className="text-muted-foreground mt-2">Não existem residências pendentes.</p>
+                <h3 className="text-lg font-semibold text-foreground">Nenhum registo encontrado</h3>
+                <p className="text-muted-foreground mt-2">Não existem residências pendentes para esta pesquisa.</p>
               </div>
             )}
           </div>

@@ -15,11 +15,14 @@ function FirebaseThemeSync() {
   const { setTheme } = useTheme()
 
   React.useEffect(() => {
+    let unsubscribeSnap: (() => void) | undefined
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeSnap?.()
+      unsubscribeSnap = undefined
       if (user) {
         // Escuta o Firestore em tempo real para sincronizar o tema da conta logada
         const docRef = doc(db, "usuariosWeb", user.uid)
-        const unsubscribeSnap = onSnapshot(docRef, (docSnap) => {
+        unsubscribeSnap = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data()
             const isDark = data.configuracoes?.darkMode ?? false
@@ -28,17 +31,19 @@ function FirebaseThemeSync() {
             setTheme(isDark ? 'dark' : 'light')
           }
         }, (error) => {
-          console.error("Erro ao sincronizar tema com o Firestore:", error)
+          if (auth.currentUser) console.error("Erro ao sincronizar tema com o Firestore:", error)
         })
 
-        return () => unsubscribeSnap()
       } else {
         // Opcional: Se o utilizador terminar sessão, podes decidir manter o tema ou resetar para o padrão do sistema
         // setTheme('system')
       }
     })
 
-    return () => unsubscribeAuth()
+    return () => {
+      unsubscribeAuth()
+      unsubscribeSnap?.()
+    }
   }, [setTheme])
 
   return null

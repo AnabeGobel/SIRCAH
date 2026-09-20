@@ -17,6 +17,7 @@ export default function AprovadasPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedResidence, setSelectedResidence] = useState<Residence | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Função para carregar dados reais do Firebase
 const carregarAprovadas = async () => {
@@ -45,7 +46,9 @@ const carregarAprovadas = async () => {
           },
           foto_url: d.foto_url || d.foto || d.imagem_url || "", 
           codigo: d.codigo || "",
-          contacto: d.contacto || ""
+          contacto: d.contacto || "",
+          documentoBi: d.documentoBi,
+          documentosOpcionais: Array.isArray(d.documentosOpcionais) ? d.documentosOpcionais : [],
         }))
 
       setResidences(formatados)
@@ -60,6 +63,15 @@ const carregarAprovadas = async () => {
   useEffect(() => {
     carregarAprovadas()
   }, [])
+
+  const normalizarPesquisa = (valor: string) =>
+    valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  const termoPesquisa = normalizarPesquisa(searchTerm.trim())
+  const residencesFiltradas = residences.filter((residence) => {
+    if (!termoPesquisa) return true
+    return [residence.codigo, residence.bairro, residence.proprietario, residence.id]
+      .some((campo) => normalizarPesquisa(campo || "").includes(termoPesquisa))
+  })
 
   return (
     <div className="flex h-screen bg-background">
@@ -90,6 +102,8 @@ const carregarAprovadas = async () => {
       <input
         type="text"
         placeholder="Pesquisar..."
+        value={searchTerm}
+        onChange={(event) => setSearchTerm(event.target.value)}
         className="h-10 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
     </div>
@@ -134,9 +148,9 @@ const carregarAprovadas = async () => {
                   <Loader2 className="h-8 w-8 animate-spin mb-2" />
                   <p>A carregar registos aprovados...</p>
                 </div>
-              ) : residences.length > 0 ? (
+              ) : residencesFiltradas.length > 0 ? (
                 <ResidencesTable
-                  residences={residences}
+                  residences={residencesFiltradas}
                   showActions={true}
                   onView={setSelectedResidence}
                 />
@@ -145,8 +159,8 @@ const carregarAprovadas = async () => {
                   <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
                     <span className="text-2xl">📋</span>
                   </div>
-                  <h3 className="text-lg font-semibold text-foreground">Nenhum registo</h3>
-                  <p className="text-muted-foreground mt-2">Ainda não existem residências aprovadas no sistema.</p>
+                  <h3 className="text-lg font-semibold text-foreground">Nenhum registo encontrado</h3>
+                  <p className="text-muted-foreground mt-2">Não existem residências aprovadas para esta pesquisa.</p>
                 </div>
               )}
             </div>

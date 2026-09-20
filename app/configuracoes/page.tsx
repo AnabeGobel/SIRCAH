@@ -354,65 +354,67 @@ export default function ConfiguracoesPage() {
   }
 
   useEffect(() => {
+    let unsubscribeSnap: (() => void) | undefined
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user)
-        setEmail(user.email || "")
-        setNome(user.displayName || "Utilizador Web")
+      unsubscribeSnap?.()
+      unsubscribeSnap = undefined
 
-        const temaLocalExclusivo = localStorage.getItem(`theme_${user.uid}`)
-        if (temaLocalExclusivo === "dark") {
-          setDarkMode(true)
-          document.documentElement.classList.add("dark")
-        } else if (temaLocalExclusivo === "light") {
-          setDarkMode(false)
-          document.documentElement.classList.remove("dark")
-        }
-
-        const docRef = doc(db, "usuariosWeb", user.uid)
-        const unsubscribeSnap = onSnapshot(
-          docRef,
-          (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data()
-              if (data.nome) setNome(data.nome)
-              if (data.email) setEmail(data.email)
-              if (data.telefone) setTelefone(data.telefone)
-              if (data.perfilTipo) setPerfilTipo(data.perfilTipo)
-              if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
-
-              if (data.configuracoes) {
-                setNovosRegistos(data.configuracoes.novosRegistos ?? true)
-                setEmailDiario(data.configuracoes.emailDiario ?? false)
-                setAlertasCriticos(data.configuracoes.alertasCriticos ?? true)
-
-                const isDark = data.configuracoes.darkMode ?? false
-                setDarkMode(isDark)
-                if (isDark) {
-                  document.documentElement.classList.add("dark")
-                  localStorage.setItem(`theme_${user.uid}`, "dark")
-                } else {
-                  document.documentElement.classList.remove("dark")
-                  localStorage.setItem(`theme_${user.uid}`, "light")
-                }
-              }
-            }
-            setLoading(false)
-          },
-          (error) => {
-            console.error("Erro ao carregar Firestore:", error)
-            setLoading(false)
-          },
-        )
-
-        return () => unsubscribeSnap()
+      if (!user) {
+        setCurrentUser(null)
+        setLoading(false)
+        document.documentElement.classList.remove("dark")
+        return
       }
 
-      setLoading(false)
-      document.documentElement.classList.remove("dark")
+      setCurrentUser(user)
+      setEmail(user.email || "")
+      setNome(user.displayName || "Utilizador Web")
+
+      const temaLocalExclusivo = localStorage.getItem(`theme_${user.uid}`)
+      if (temaLocalExclusivo === "dark") {
+        setDarkMode(true)
+        document.documentElement.classList.add("dark")
+      } else if (temaLocalExclusivo === "light") {
+        setDarkMode(false)
+        document.documentElement.classList.remove("dark")
+      }
+
+      const docRef = doc(db, "usuariosWeb", user.uid)
+      unsubscribeSnap = onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data()
+            if (data.nome) setNome(data.nome)
+            if (data.email) setEmail(data.email)
+            if (data.telefone) setTelefone(data.telefone)
+            if (data.perfilTipo) setPerfilTipo(data.perfilTipo)
+            if (data.avatarUrl) setAvatarUrl(data.avatarUrl)
+
+            if (data.configuracoes) {
+              setNovosRegistos(data.configuracoes.novosRegistos ?? true)
+              setEmailDiario(data.configuracoes.emailDiario ?? false)
+              setAlertasCriticos(data.configuracoes.alertasCriticos ?? true)
+
+              const isDark = data.configuracoes.darkMode ?? false
+              setDarkMode(isDark)
+              document.documentElement.classList.toggle("dark", isDark)
+              localStorage.setItem(`theme_${user.uid}`, isDark ? "dark" : "light")
+            }
+          }
+          setLoading(false)
+        },
+        (error) => {
+          if (auth.currentUser) console.error("Erro ao carregar Firestore:", error)
+          setLoading(false)
+        },
+      )
     })
 
-    return () => unsubscribeAuth()
+    return () => {
+      unsubscribeAuth()
+      unsubscribeSnap?.()
+    }
   }, [])
 
   if (loading) {

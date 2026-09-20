@@ -16,6 +16,12 @@ export interface Coordenadas {
   lng: number
 }
 
+export interface DocumentoResidencia {
+  mimeType?: string
+  name?: string
+  uri?: string
+}
+
 export interface Residencia {
   id: string              // ID do documento Firestore
   bairro: string
@@ -36,6 +42,8 @@ export interface Residencia {
   comprovativoUrl?: string
   justificativaReenvio?: string
   anexoJustificacao?: string
+  documentoBi?: DocumentoResidencia
+  documentosOpcionais?: DocumentoResidencia[]
 }
 
 // ─── Helpers de conversão ──────────────────────────────────────────────────────
@@ -85,6 +93,8 @@ const converterDoc = (id: string, data: any): Residencia => ({
   comprovativoUrl: data.comprovativoUrl ?? data.justificativa?.comprovativoUrl ?? "",
   justificativaReenvio: data.comentarioJustificativa ?? data.justificativa?.comentarioJustificativa ?? data.justificativaReenvio ?? data.justificativaTexto ?? data.mensagemReenvio ?? data.justificativaEdicao ?? (typeof data.justificativa === "string" ? data.justificativa : "") ?? "",
   anexoJustificacao: data.comprovativoUrl ?? data.justificativa?.comprovativoUrl ?? data.anexoJustificacao ?? data.documentoJustificacao ?? data.imagemJustificacao ?? data.justificativaArquivo ?? data.comprovativoReenvio ?? "",
+  documentoBi: data.documentoBi ?? undefined,
+  documentosOpcionais: Array.isArray(data.documentosOpcionais) ? data.documentosOpcionais : [],
 })
 
 // ─── Função principal ─────────────────────────────────────────────────────────

@@ -19,6 +19,9 @@ import { obterAnexoJustificacao, obterJustificativaReenvio, obterNomeComprovativ
 import { Bell, Search, Loader2, CheckCircle2, XCircle, FilePlus, ChevronRight, MapPin, Activity, MessageSquare, Paperclip } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { collection, onSnapshot } from "firebase/firestore"
+import { auth, db } from "@/lib/Services/firebaseConfig"
+import { onAuthStateChanged } from "firebase/auth"
 
 // Carregamento dinâmico sem SSR para compatibilidade do Leaflet no Next.js
 const MapaReal = dynamic(() => import("@/components/mapa-real"), {
@@ -37,6 +40,7 @@ interface Notificacao {
   tempo: string
   tipo: "registos" | "validacoes" | "rejeicoes"
   icone: "registo" | "aprovado" | "rejeitada"
+  residenceId?: string
 }
 
 export default function DashboardPage() {
@@ -50,6 +54,7 @@ export default function DashboardPage() {
   const [pendingAction, setPendingAction] = useState<Residence | null>(null)
   const [selectedJustification, setSelectedJustification] = useState<Residence | null>(null)
   const [generatedCode, setGeneratedCode] = useState<string>("")
+  const [searchTerm, setSearchTerm] = useState("")
 
   // ── Estados do Popover de Notificações ──────────────────────────────────────
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -65,6 +70,40 @@ export default function DashboardPage() {
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribe?.()
+      if (!user) {
+        setNotificacoes([])
+        return
+      }
+
+      unsubscribe = onSnapshot(collection(db, "notificacoes"), (snapshot) => {
+        const eventos: Notificacao[] = snapshot.docs.map((item) => {
+          const dados = item.data()
+          return {
+            id: `event-${item.id}`,
+            titulo: dados.titulo || "Nova atividade na residência",
+            mensagem: dados.mensagem || "Existe uma nova atividade para verificar.",
+            tempo: "Agora",
+            tipo: dados.tipo === "validacoes" ? "validacoes" : dados.tipo === "rejeicoes" ? "rejeicoes" : "registos",
+            icone: dados.tipo === "validacoes" ? "aprovado" : dados.tipo === "rejeicoes" ? "rejeitada" : "registo",
+            residenceId: dados.residenciaId,
+          }
+        })
+        setNotificacoes(eventos.slice(0, 10))
+      }, (error) => {
+        if (auth.currentUser) console.error("Erro ao carregar atividades do dashboard:", error)
+      })
+    })
+
+    return () => {
+      unsubscribeAuth()
+      unsubscribe?.()
+    }
   }, [])
 
   const carregarDadosDashboard = async () => {
@@ -166,7 +205,17 @@ export default function DashboardPage() {
     rejeitadas: residences.filter(r => r.status === "rejeitada").length,
   }
 
-  const pendingResidences = residences.filter((r) => r.status === "pendente")
+  const normalizarPesquisa = (valor: string) =>
+    valor.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+  const termoPesquisa = normalizarPesquisa(searchTerm.trim())
+  const residencesFiltradas = termoPesquisa
+    ? residences.filter((residence) => {
+        const campos = [residence.codigo, residence.bairro, residence.proprietario, residence.id]
+        return campos.some((campo) => normalizarPesquisa(campo || "").includes(termoPesquisa))
+      })
+    : residences
+  const pendingResidences = residencesFiltradas.filter((r) => r.status === "pendente")
   const justificationResidences = residences.filter((r) => r.justificativaReenvio || r.anexoJustificacao)
 
   const bairros = residences.reduce<Record<string, number>>((acc, residence) => {
@@ -176,7 +225,7 @@ export default function DashboardPage() {
   }, {})
 
   const bairrosOrdenados = Object.entries(bairros).sort(([, totalA], [, totalB]) => totalB - totalA)
-  const activityItems = residences.slice(0, 3).map((residence) => ({
+  const activityItems = residencesFiltradas.slice(0, 3).map((residence) => ({
     residence,
     title: residence.status === "aprovado"
       ? `Residência ${residence.codigo || residence.id} aprovada`
@@ -241,6 +290,15 @@ export default function DashboardPage() {
     router.push(`/historico?filtro=${tipoFiltro}`)
   }
 
+  const abrirNotificacao = (item: Notificacao) => {
+    setNotificationsOpen(false)
+    if (item.residenceId) {
+      router.push(`/residencias/${item.residenceId}`)
+      return
+    }
+    irParaHistoricoComFiltro(item.tipo)
+  }
+
   return (
     <div className="flex h-screen bg-background">
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -255,6 +313,8 @@ export default function DashboardPage() {
               <input
                 type="text"
                 placeholder="Pesquisar..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="h-10 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
               />
             </div>
@@ -329,7 +389,7 @@ export default function DashboardPage() {
                       notificacoes.map((item) => (
                         <button
                           key={item.id}
-                          onClick={() => irParaHistoricoComFiltro(item.tipo)}
+                          onClick={() => abrirNotificacao(item)}
                           className="w-full text-left p-3.5 hover:bg-muted/50 transition-colors flex items-start gap-3 group"
                         >
                           <div className="mt-0.5 shrink-0">
@@ -467,7 +527,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="relative h-56 w-full overflow-hidden">
                         <MapaReal
-                          residencias={residences as any}
+                          residencias={residencesFiltradas as any}
                           selectedResidence={selectedResidence as any}
                           onSelectResidence={(res) => setSelectedResidence(res as any)}
                           modoSatélite={false}

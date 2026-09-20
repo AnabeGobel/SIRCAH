@@ -1,4 +1,4 @@
-import { db } from '@/lib/Services/firebaseConfig';
+import { auth, db } from '@/lib/Services/firebaseConfig';
 import {
   collection,
   query,
@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { generateUniqueCode } from './generateCode';
 import QRCode from 'qrcode';
+import { criarNotificacaoResidencia } from './notification-service';
 
 export interface ResidencialDoc extends DocumentData {
   id: string;
@@ -104,6 +105,13 @@ export const aprovarResidencia = async (residenciaId: string) => {
       aprovadoEm: serverTimestamp(),
     });
 
+    await criarNotificacaoResidencia({
+      residenciaId: residenciaId,
+      titulo: "Registo aprovado e código gerado",
+      mensagem: `A residência foi aprovada. Código: ${novoCodigo}.`,
+      tipo: "validacoes",
+    });
+
     return { 
       sucesso: true, 
       novoCodigo, 
@@ -136,6 +144,13 @@ export const rejeitarResidencia = async (
       motivoRejeicao: motivoNormalizado,
       rejeitadoEm: serverTimestamp(),
     });
+
+    await criarNotificacaoResidencia({
+      residenciaId: residenciaId,
+      titulo: "Registo rejeitado",
+      mensagem: `O registo foi rejeitado: ${motivoNormalizado}`,
+      tipo: "rejeicoes",
+    });
     
     return { sucesso: true };
   } catch (error) {
@@ -154,16 +169,37 @@ export const alterarEstadoResidencia = async (
     throw new Error("A mensagem da alteração é obrigatória.");
   }
 
+  if (!auth.currentUser) {
+    throw new Error("A sessão expirou. Entre novamente para alterar a validade da residência.");
+  }
+
   const docRef = doc(db, "residencias", residenciaId);
-  await updateDoc(docRef, {
-    estadoResidencia: estado,
-    mensagemEstado: mensagemNormalizada,
-    estadoAlteradoEm: serverTimestamp(),
-    historicoEstado: {
-      estado,
-      mensagem: mensagemNormalizada,
-      alteradoEm: serverTimestamp(),
-    },
+  try {
+    await updateDoc(docRef, {
+      estadoResidencia: estado,
+      mensagemEstado: mensagemNormalizada,
+      estadoAlteradoEm: serverTimestamp(),
+      historicoEstado: {
+        estado,
+        mensagem: mensagemNormalizada,
+        alteradoEm: serverTimestamp(),
+      },
+    });
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String(error.code) : "unknown";
+    console.error("Erro ao guardar validade da residência:", { code, residenciaId });
+    throw new Error(
+      code === "permission-denied"
+        ? "Sem permissão para alterar esta residência. Publique as regras do Firestore e confirme a sessão do utilizador."
+        : "Não foi possível guardar a validade da residência."
+    );
+  }
+
+  await criarNotificacaoResidencia({
+    residenciaId: residenciaId,
+    titulo: estado === "valido" ? "Residência validada" : "Residência marcada como inválida",
+    mensagem: mensagemNormalizada,
+    tipo: "atualizacoes",
   });
 
   return { sucesso: true, estado, mensagem: mensagemNormalizada };

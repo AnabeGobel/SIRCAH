@@ -10,6 +10,7 @@ import {
 //    igual à lógica usada na app mobile.
 import { db } from "../Services/firebaseConfig"
 import { gerarProximoCodigo, gerarQrCodeUrl } from "./codigo-utils"
+import { criarNotificacaoResidencia } from "./notification-service"
 
 // ─── Helper: converte File → base64 string ────────────────────────────────────
 /**
@@ -34,6 +35,12 @@ export interface Coordenadas {
   lng: number
 }
 
+export interface DocumentoResidencia {
+  mimeType?: string
+  name?: string
+  uri?: string
+}
+
 export interface Residencia {
   id: string              // ID do documento Firestore
   aprovadoEm: Date | null
@@ -49,6 +56,8 @@ export interface Residencia {
   rua: string
   telefone: string
   status: StatusResidencia
+  documentoBi?: DocumentoResidencia
+  documentosOpcionais?: DocumentoResidencia[]
 }
 
 // ─── Dados de entrada para o registo de uma nova residência ──────────────────
@@ -64,6 +73,8 @@ export interface NovaResidenciaInput {
   // ✅ Ficheiro de imagem — o serviço converte para base64 internamente
   //    e guarda directamente no Firestore (sem Firebase Storage)
   fotoFile?:    File | null
+  documentoBi?: DocumentoResidencia | null
+  documentosOpcionais?: DocumentoResidencia[]
 }
 
 // ─── Helpers de conversão ──────────────────────────────────────────────────────
@@ -108,6 +119,8 @@ const converterDoc = (id: string, data: any): Residencia => ({
   rua:          data.rua          ?? "",
   telefone:     data.telefone     ?? "",
   status:       (data.status as StatusResidencia) ?? "pendente",
+  documentoBi: data.documentoBi ?? undefined,
+  documentosOpcionais: Array.isArray(data.documentosOpcionais) ? data.documentosOpcionais : [],
 })
 
 // ─── Função principal ─────────────────────────────────────────────────────────
@@ -168,6 +181,15 @@ export const registarNovaResidencia = async (
     codigo:       null,
     qr_code_url:  null,
     aprovadoEm:   null,
+    documentoBi: input.documentoBi ?? null,
+    documentosOpcionais: input.documentosOpcionais ?? [],
+  })
+
+  await criarNotificacaoResidencia({
+    residenciaId: docRef.id,
+    titulo: "Novo registo de residência",
+    mensagem: `O registo de ${input.nome_morador || "um morador"} foi enviado para validação.`,
+    tipo: "registos",
   })
 
   return { id: docRef.id }

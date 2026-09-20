@@ -3,6 +3,7 @@
 import { Eye, Check, X, Power } from "lucide-react"
 import { StatusBadge } from "./status-badge"
 import { Button } from "@/components/ui/button"
+import type { ResidenceDocument } from "./residence-documents"
 import {
   Table,
   TableBody,
@@ -34,6 +35,8 @@ export interface Residence {
   comprovativoUrl?: string;
   justificativaReenvio?: string;
   anexoJustificacao?: string;
+  documentoBi?: ResidenceDocument;
+  documentosOpcionais?: ResidenceDocument[];
 }
 
 

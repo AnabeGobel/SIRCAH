@@ -42,6 +42,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /notificacoes/{notificacaoId} {
+      allow read, create: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["lida"]);
+      allow delete: if false;
+    }
+
     // As restantes regras existentes do projecto devem continuar aqui.
     // Não substitua regras operacionais sem as migrar para este ficheiro.
   }

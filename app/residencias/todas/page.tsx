@@ -38,6 +38,8 @@ export default function TodasResidenciasPage() {
         foto_url:  d.foto_url  || d.foto || "",
         codigo:    d.codigo    || "",
         contacto:  d.telefone  || d.contacto || "",
+        documentoBi: d.documentoBi,
+        documentosOpcionais: Array.isArray(d.documentosOpcionais) ? d.documentosOpcionais : [],
       })))
     } catch { setError("Falha ao conectar com o banco de dados do SIRCAH.") }
     finally   { setLoading(false) }
@@ -71,7 +73,7 @@ export default function TodasResidenciasPage() {
       await carregarTodas()
     } catch (error) {
       console.error("Erro ao alterar estado da residência:", error)
-      alert("Falha ao alterar o estado da residência.")
+      alert(error instanceof Error ? error.message : "Falha ao alterar o estado da residência.")
     }
   }
 

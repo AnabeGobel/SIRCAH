@@ -4,6 +4,7 @@ import { X, MapPin, Calendar, User, Clock, CheckCircle, XCircle, Phone, Home } f
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import type { Residence } from "./residences-table"
+import { ResidenceDocuments } from "./residence-documents"
 
 interface ResidenceDetailPanelProps {
   residence: Residence | null
@@ -117,6 +118,11 @@ export function ResidenceDetailPanel({
             </div>
           </div>
         </div>
+
+        <ResidenceDocuments
+          documentoBi={residence.documentoBi}
+          documentosOpcionais={residence.documentosOpcionais}
+        />
 
         {/* Histórico/Rastreabilidade */}
         <div className="pt-2">
