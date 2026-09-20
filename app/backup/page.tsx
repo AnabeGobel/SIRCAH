@@ -134,7 +134,7 @@ export default function BackupPage() {
   }
 
   const exportDocx = async () => {
-    const children: Paragraph[] = [new Paragraph({ text: INSTITUTION, heading: HeadingLevel.TITLE }), new Paragraph(OBJECTIVE), new Paragraph(`Exportado em ${new Date().toLocaleString("pt-PT")}`)]
+    const children: (Paragraph | Table)[] = [new Paragraph({ text: INSTITUTION, heading: HeadingLevel.TITLE }), new Paragraph(OBJECTIVE), new Paragraph(`Exportado em ${new Date().toLocaleString("pt-PT")}`)]
     Object.entries(rows).forEach(([title, values]) => {
       const enabled = (title === "residencias" && includeResidences) || (title === "moradores" && includeMoradores) || (title === "historico" && includeHistory)
       if (!enabled) return

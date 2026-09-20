@@ -3,7 +3,7 @@
  * Substitua GOOGLE_MAPS_API_KEY pela sua chave com a API "Geocoding API" activada.
  */
 
-export const GOOGLE_MAPS_API_KEY = "AIzaSyDf6c1htylpbxEPFOtSFm7PH_9_uvhgtjQ"
+export const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDf6c1htylpbxEPFOtSFm7PH_9_uvhgtjQ"
 
 export interface ResultadoGeocoding {
   lat: number

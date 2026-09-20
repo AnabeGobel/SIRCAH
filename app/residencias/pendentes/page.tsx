@@ -83,7 +83,7 @@ export default function PendentesPage() {
       // Chama o backend para aprovar e gerar o código SIRCAH
       const resultado = await aprovarResidencia(r.id)
       
-      const novoCodigo = resultado?.novoCodigo || resultado?.codigo || r.id
+      const novoCodigo = resultado?.novoCodigo || r.id
       setGeneratedCode(novoCodigo)
       setPendingAction(r)
       setShowQRModal(true)

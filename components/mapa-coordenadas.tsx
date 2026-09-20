@@ -1,9 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import dynamic from "next/dynamic"
 import { Loader2, MapPin, Navigation, Landmark, RotateCcw, RotateCw } from "lucide-react"
 import { GOOGLE_MAPS_API_KEY, geocodificarCoordenadas } from "@/lib/residencia/geocoding-utils"
-import { MapaCoordenadasFallback } from "@/components/mapa-coordenadas-fallback"
+
+const MapaCoordenadasFallback = dynamic(
+  () => import("@/components/mapa-coordenadas-fallback").then((module) => module.MapaCoordenadasFallback),
+  { ssr: false },
+)
 
 interface MapaCoordenadasProps {
   lat: number
