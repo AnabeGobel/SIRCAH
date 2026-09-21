@@ -11,7 +11,6 @@ import { StatusBadge } from "@/components/status-badge"
 import { Timeline, type TimelineEvent } from "@/components/timeline"
 import { QRCodeModal } from "@/components/qr-code-modal"
 import { RejectModal } from "@/components/reject-modal"
-import { ResidenceDocuments } from "@/components/residence-documents"
 import { db } from "@/lib/Services/firebaseConfig"
 import { doc, getDoc } from "firebase/firestore"
 import { rejeitarResidencia } from "@/lib/residencia/residenciaService"
@@ -201,11 +200,6 @@ const formatarData = (data: any) => {
               <div className="mb-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><ImageIcon className="h-5 w-5" /></div><div><h2 className="text-lg font-semibold text-foreground">Foto da residência</h2><p className="text-sm text-muted-foreground">Evidência visual submetida no registo</p></div></div></div>
               <div className="aspect-video overflow-hidden rounded-xl border border-border bg-muted/40">{residence.foto_url ? <img src={residence.foto_url} className="h-full w-full object-cover" alt="Foto da residência" /> : <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Nenhuma foto enviada</div>}</div>
             </section>
-
-            <ResidenceDocuments
-              documentoBi={residence.documentoBi}
-              documentosOpcionais={residence.documentosOpcionais}
-            />
           </div>
 
           <div className="space-y-6">
