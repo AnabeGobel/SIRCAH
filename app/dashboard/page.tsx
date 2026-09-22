@@ -44,6 +44,17 @@ interface Notificacao {
   residenceId?: string
 }
 
+const mesclarNotificacoes = (...listas: Notificacao[][]) => {
+  const mapa = new Map<string, Notificacao>()
+
+  listas.flat().forEach((item) => {
+    if (!item) return
+    mapa.set(item.id, { ...item })
+  })
+
+  return [...mapa.values()].slice(0, 10)
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [residences, setResidences] = useState<Residence[]>([])
@@ -95,7 +106,8 @@ export default function DashboardPage() {
             residenceId: dados.residenciaId,
           }
         })
-        setNotificacoes(eventos.slice(0, 10))
+
+        setNotificacoes((prev) => mesclarNotificacoes(prev, eventos.slice(0, 10)))
       }, (error) => {
         if (auth.currentUser) console.error("Erro ao carregar atividades do dashboard:", error)
       })
@@ -187,7 +199,7 @@ export default function DashboardPage() {
         }
       })
 
-      setNotificacoes(listaNotif)
+      setNotificacoes((prev) => mesclarNotificacoes(prev, listaNotif))
     } catch (error) {
       console.error("Erro no Dashboard SIRCAH:", error)
     } finally {
