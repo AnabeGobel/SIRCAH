@@ -23,35 +23,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Não pode remover a sua própria conta." }, { status: 400 })
     }
 
-    const profileRef = adminDb.collection("usuariosWeb").doc(targetUid)
-    const profileSnapshot = await profileRef.get()
+    const profileCollections = ["usuariosWeb", "usuarios", "agentes", "users"]
+    let removidoNoFirestore = false
 
-    if (!profileSnapshot.exists) {
-      return NextResponse.json({ error: "Utilizador não encontrado no sistema." }, { status: 404 })
+    for (const collectionName of profileCollections) {
+      const profileRef = adminDb.collection(collectionName).doc(targetUid)
+      const profileSnapshot = await profileRef.get()
+
+      if (profileSnapshot.exists) {
+        await profileRef.delete()
+        removidoNoFirestore = true
+      }
     }
 
-    const profileData = profileSnapshot.data() || {}
-    const targetEmail = String(profileData.email || "").trim()
-
-    await profileRef.delete()
-
-    if (targetEmail) {
-      try {
-        await adminAuth.deleteUser(targetUid)
-      } catch (authError: any) {
-        if (authError?.code !== "auth/user-not-found") {
-          console.error("Erro ao remover utilizador do Firebase Auth:", authError)
-          return NextResponse.json(
-            { error: "Utilizador removido do sistema, mas não foi possível remover a conta de autenticação." },
-            { status: 500 }
-          )
-        }
+    let removidoNoAuth = false
+    try {
+      await adminAuth.deleteUser(targetUid)
+      removidoNoAuth = true
+    } catch (authError: any) {
+      if (authError?.code !== "auth/user-not-found") {
+        console.error("Erro ao remover utilizador do Firebase Auth:", authError)
       }
+    }
+
+    if (!removidoNoFirestore && !removidoNoAuth) {
+      return NextResponse.json({ error: "Utilizador não encontrado no sistema." }, { status: 404 })
     }
 
     return NextResponse.json({
       success: true,
-      message: "Utilizador removido com sucesso.",
+      message: removidoNoAuth
+        ? "Utilizador removido com sucesso."
+        : "Utilizador removido do sistema, mas a conta de autenticação já não existia.",
     })
   } catch (error: any) {
     console.error("Erro ao remover utilizador:", error)
