@@ -22,6 +22,7 @@ import Link from "next/link"
 import { collection, onSnapshot } from "firebase/firestore"
 import { auth, db } from "@/lib/Services/firebaseConfig"
 import { onAuthStateChanged } from "firebase/auth"
+import { toast } from "sonner"
 
 // Carregamento dinâmico sem SSR para compatibilidade do Leaflet no Next.js
 const MapaReal = dynamic(() => import("@/components/mapa-real"), {
