@@ -128,7 +128,7 @@ export default function BemVindoPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/60 backdrop-blur-sm border border-[#E5E4E0] rounded-full px-4 py-2 mb-8">
             <span className="w-2 h-2 bg-[#27AE60] rounded-full animate-pulse" />
-            <span className="text-sm text-[#6B7280]">Sistema Ativo na Provincia do Huambo</span>
+            <span className="text-sm text-[#6B7280]">Sistema Ativo no Município do Huambo</span>
           </div>
 
           {/* Main Title */}
