@@ -14,6 +14,7 @@ import { obterAnexoJustificacao, obterJustificativaReenvio } from "@/lib/residen
 import { Search, Filter, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NotificationBell } from "@/components/notification-bell"
+import { toast } from "sonner"
 
 export default function PendentesPage() {
   const [residences, setResidences] = useState<Residence[]>([])
@@ -113,6 +114,7 @@ export default function PendentesPage() {
 
     try {
       await rejeitarResidencia(pendingAction.id, reason)
+      toast.success("Residência rejeitada com sucesso.")
 
       // Remove da lista local
       setResidences((prev) => prev.filter((item) => item.id !== pendingAction.id))
@@ -122,7 +124,7 @@ export default function PendentesPage() {
       }
     } catch (err) {
       console.error("Erro ao rejeitar residência:", err)
-      alert("Falha ao rejeitar o registo.")
+      toast.error("Falha ao rejeitar o registo. Verifique o motivo e tente novamente.")
     } finally {
       setShowRejectModal(false)
       setPendingAction(null)

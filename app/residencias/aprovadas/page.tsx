@@ -4,13 +4,12 @@ import { useState, useEffect } from "react"
 
 import { ResidencesTable, type Residence } from "@/components/residences-table"
 import { ResidenceDetailPanel } from "@/components/residence-detail-panel"
-// Importamos o serviço de busca (certifique-se que buscarResidenciasAprovadas existe no seu service)
-import { buscarResidencias } from "@/lib/residencia/residenciaService"
+import { ChangeStatusModal } from "@/components/change-status-modal"
+import { buscarResidencias, alterarEstadoResidencia } from "@/lib/residencia/residenciaService"
 import { Search, Download, Loader2, AlertCircle } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { Button } from "@/components/ui/button"
-import { collection, query, where, getDocs } from "firebase/firestore"
-import { db } from "@/lib/Services/firebaseConfig"
+import { toast } from "sonner"
 
 export default function AprovadasPage() {
   const [residences, setResidences] = useState<Residence[]>([])
@@ -18,6 +17,7 @@ export default function AprovadasPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedResidence, setSelectedResidence] = useState<Residence | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [statusAction, setStatusAction] = useState<{ residence: Residence; nextState: "valido" | "invalido" } | null>(null)
 
   // Função para carregar dados reais do Firebase
 const carregarAprovadas = async () => {
@@ -40,6 +40,8 @@ const carregarAprovadas = async () => {
           rua: d.rua || "",
           criadoEm: d.criadoEm || d.dataRegisto || "Data pendente",
           status: "aprovado" as const,
+          estadoResidencia: d.estadoResidencia || "valido",
+          mensagemEstado: d.mensagemEstado || "",
           coordenadas: {
             lat: Number(d.coordenadas?.latitude ?? d.coordenadas?.lat ?? -12.77),
             lng: Number(d.coordenadas?.longitude ?? d.coordenadas?.lng ?? 15.73)
@@ -72,6 +74,27 @@ const carregarAprovadas = async () => {
     return [residence.codigo, residence.bairro, residence.proprietario, residence.id]
       .some((campo) => normalizarPesquisa(campo || "").includes(termoPesquisa))
   })
+
+  const handleToggleStatus = (residence: Residence) => {
+    setStatusAction({
+      residence,
+      nextState: residence.estadoResidencia === "invalido" ? "valido" : "invalido",
+    })
+  }
+
+  const confirmStatusChange = async (message: string) => {
+    if (!statusAction) return
+
+    try {
+      await alterarEstadoResidencia(statusAction.residence.id, statusAction.nextState, message)
+      toast.success(statusAction.nextState === "valido" ? "Residência validada com sucesso." : "Residência marcada como inválida com sucesso.")
+      setStatusAction(null)
+      await carregarAprovadas()
+    } catch (error) {
+      console.error("Erro ao alterar estado da residência:", error)
+      toast.error(error instanceof Error ? error.message : "Falha ao alterar o estado da residência.")
+    }
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -153,6 +176,7 @@ const carregarAprovadas = async () => {
                   residences={residencesFiltradas}
                   showActions={true}
                   onView={setSelectedResidence}
+                  onToggleStatus={handleToggleStatus}
                 />
               ) : (
                 <div className="rounded-2xl border border-border bg-card p-12 text-center">
@@ -175,6 +199,16 @@ const carregarAprovadas = async () => {
           )}
         </div>
       </main>
+
+      {statusAction && (
+        <ChangeStatusModal
+          isOpen={Boolean(statusAction)}
+          onClose={() => setStatusAction(null)}
+          onConfirm={confirmStatusChange}
+          residenceCode={statusAction.residence.codigo || statusAction.residence.id}
+          nextState={statusAction.nextState}
+        />
+      )}
     </div>
   )
 }

@@ -16,25 +16,33 @@ import { Label } from "@/components/ui/label"
 interface RejectModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (reason: string) => void
+  onConfirm: (reason: string) => Promise<void> | void
   residenceCode: string
 }
 
 export function RejectModal({ isOpen, onClose, onConfirm, residenceCode }: RejectModalProps) {
   const [reason, setReason] = useState("")
+  const [error, setError] = useState("")
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setReason("")
+      setError("")
       onClose()
     }
   }
 
-  const handleConfirm = () => {
-    if (reason.trim()) {
-      onConfirm(reason.trim())
-      setReason("")
+  const handleConfirm = async () => {
+    const normalizedReason = reason.trim()
+
+    if (!normalizedReason) {
+      setError("É obrigatório indicar o motivo da rejeição da residência.")
+      return
     }
+
+    setError("")
+    await onConfirm(normalizedReason)
+    setReason("")
   }
 
   return (
@@ -63,9 +71,13 @@ export function RejectModal({ isOpen, onClose, onConfirm, residenceCode }: Rejec
                 id="reason"
                 placeholder="Descreva o motivo pelo qual esta residência está a ser rejeitada..."
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={(e) => {
+                  setReason(e.target.value)
+                  if (error) setError("")
+                }}
                 className="min-h-[120px] rounded-xl resize-none bg-muted/30 border-border focus:border-primary"
               />
+              {error && <p className="text-xs font-medium text-destructive">{error}</p>}
             </div>
           </div>
 
@@ -80,7 +92,6 @@ export function RejectModal({ isOpen, onClose, onConfirm, residenceCode }: Rejec
             <Button
               className="flex-1 h-11 rounded-xl bg-status-rejected hover:bg-status-rejected/90 text-white"
               onClick={handleConfirm}
-              disabled={!reason.trim()}
             >
               Confirmar Rejeição
             </Button>

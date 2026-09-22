@@ -1,6 +1,7 @@
 "use client"
 
-import { X, MapPin, Calendar, User, Clock, CheckCircle, XCircle, Phone, Home } from "lucide-react"
+import Link from "next/link"
+import { X, MapPin, Calendar, User, Clock, CheckCircle, XCircle, Phone, Home, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "./status-badge"
 import type { Residence } from "./residences-table"
@@ -50,6 +51,14 @@ export function ResidenceDetailPanel({
       </div>
 
       <div className="p-6 space-y-6">
+        <Link
+          href={`/residencias/${residence.id}`}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Ver detalhes completos
+        </Link>
+
         {/* Imagem - Foco exclusivo na correção da exibição */}
         <div className="aspect-video rounded-2xl bg-muted overflow-hidden border border-border shadow-inner">
           {/* Verificamos residence.foto_url e também (residence as any).foto_url 

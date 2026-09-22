@@ -9,34 +9,113 @@ export interface ResidenceDocument {
   uri?: string
 }
 
+const normalizarUri = (uri?: string) => {
+  if (!uri) return ""
+  const valor = uri.trim()
+  if (!valor) return ""
+  if (valor.startsWith("/")) return new URL(valor, window.location.origin).toString()
+  return valor
+}
+
 const isImageUri = (uri?: string, mimeType?: string) =>
-  Boolean(uri && (mimeType?.startsWith("image/") || uri.startsWith("data:image/")))
+  Boolean(uri && (mimeType?.startsWith("image/") || uri.startsWith("data:image/") || /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(uri)))
+
+const isPdfUri = (uri?: string, mimeType?: string) =>
+  Boolean(
+    uri &&
+      (mimeType?.toLowerCase() === "application/pdf" ||
+        uri.startsWith("data:application/pdf") ||
+        /\.pdf(\?.*)?$/i.test(uri))
+  )
 
 const isUsableUri = (uri?: string) =>
-  Boolean(uri && (uri.startsWith("data:") || uri.startsWith("blob:") || /^https?:\/\//i.test(uri)))
+  Boolean(
+    uri &&
+      /^(data:|blob:|https?:\/\/|file:\/\/|\/|\\\\)/i.test(uri)
+  )
 
 interface ResidenceDocumentsProps {
   documentoBi?: unknown
   documentosOpcionais?: unknown
+  documentoBiExtra?: unknown
+}
+
+const resolverUri = (value: unknown): string | undefined => {
+  if (typeof value === "string") return normalizarUri(value)
+  if (typeof value === "object" && value) {
+    const obj = value as Record<string, unknown>
+    const candidatos = [
+      obj.uri,
+      obj.url,
+      obj.href,
+      obj.link,
+      obj.fileUrl,
+      obj.downloadUrl,
+      obj.src,
+      obj.path,
+      obj.arquivo,
+      obj.file,
+      obj.documento,
+      obj.anexo,
+    ]
+
+    for (const candidato of candidatos) {
+      if (typeof candidato === "string" && candidato.trim()) return normalizarUri(candidato)
+    }
+  }
+
+  return undefined
+}
+
+const resolverNome = (value: unknown): string | undefined => {
+  if (typeof value === "string") return value
+  if (typeof value === "object" && value) {
+    const obj = value as Record<string, unknown>
+    const nome = [obj.name, obj.nome, obj.filename, obj.fileName, obj.title, obj.label].find(
+      (item): item is string => typeof item === "string" && Boolean(item.trim())
+    )
+    return nome ? nome.trim() : undefined
+  }
+
+  return undefined
 }
 
 const normalizeDocument = (documento: unknown): ResidenceDocument | null => {
-  if (!documento || typeof documento !== "object") return null
+  if (!documento) return null
+
+  if (typeof documento === "string") {
+    const uri = normalizarUri(documento)
+    return uri ? { uri, name: uri.split("/").pop() || "Documento" } : null
+  }
+
+  if (Array.isArray(documento)) {
+    const firstValid = documento.map(normalizeDocument).find(Boolean)
+    return firstValid ?? null
+  }
+
+  if (typeof documento !== "object") return null
 
   const value = documento as Record<string, unknown>
+  const uri = resolverUri(value)
+  if (!uri) return null
+
   return {
-    mimeType: typeof value.mimeType === "string" ? value.mimeType : undefined,
-    name: typeof value.name === "string" ? value.name : undefined,
-    uri: typeof value.uri === "string" ? value.uri : undefined,
+    mimeType: typeof value.mimeType === "string" ? value.mimeType : typeof value.type === "string" ? value.type : undefined,
+    name: resolverNome(value) || uri.split("/").pop() || "Documento",
+    uri,
   }
 }
 
-export function ResidenceDocuments({ documentoBi, documentosOpcionais }: ResidenceDocumentsProps) {
+export function ResidenceDocuments({ documentoBi, documentosOpcionais, documentoBiExtra }: ResidenceDocumentsProps) {
   const [imagemAmpliada, setImagemAmpliada] = useState<{ uri: string; name: string } | null>(null)
-  const bi = normalizeDocument(documentoBi)
-  const opcionais = Array.isArray(documentosOpcionais)
-    ? documentosOpcionais.map(normalizeDocument).filter((documento): documento is ResidenceDocument => documento !== null)
-    : []
+  const bi = normalizeDocument(documentoBi ?? documentoBiExtra)
+  const documentosBrutos = Array.isArray(documentosOpcionais)
+    ? documentosOpcionais
+    : documentosOpcionais
+      ? [documentosOpcionais]
+      : []
+
+  const opcionais = documentosBrutos.map(normalizeDocument).filter((documento): documento is ResidenceDocument => documento !== null)
 
   useEffect(() => {
     if (!imagemAmpliada) return
@@ -49,48 +128,68 @@ export function ResidenceDocuments({ documentoBi, documentosOpcionais }: Residen
 
   if (!bi && opcionais.length === 0) return null
 
-  const renderDocument = (documento: ResidenceDocument, label: string, key: string) => (
-    <div key={key} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-3">
-      <div className="min-w-0 flex-1">
-        {isImageUri(documento.uri, documento.mimeType) ? (
+  const renderDocument = (documento: ResidenceDocument, label: string, key: string) => {
+    const uri = normalizarUri(documento.uri)
+    const isImage = isImageUri(uri, documento.mimeType)
+    const isPdf = isPdfUri(uri, documento.mimeType)
+
+    return (
+      <div key={key} className="overflow-hidden rounded-xl border border-border bg-background">
+        {isImage ? (
           <button
             type="button"
-            onClick={() => setImagemAmpliada({ uri: documento.uri!, name: documento.name || label })}
-            className="block w-full cursor-zoom-in overflow-hidden rounded-lg border border-border bg-muted/30"
+            onClick={() => setImagemAmpliada({ uri: uri, name: documento.name || label })}
+            className="block w-full cursor-zoom-in bg-muted/30 p-2 text-left"
             aria-label={`Ampliar ${documento.name || label}`}
           >
-            <img src={documento.uri} alt={documento.name || label} className="max-h-56 w-full object-contain" />
+            <img src={uri} alt={documento.name || label} className="max-h-56 w-full rounded-lg object-contain" />
           </button>
+        ) : isPdf ? (
+          <div className="bg-muted/30 p-2">
+            <iframe
+              src={uri}
+              title={documento.name || label}
+              className="h-72 w-full rounded-lg border border-border bg-white"
+            />
+          </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 p-3">
             <FileText className="h-5 w-5 shrink-0 text-primary" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">{documento.name || label}</p>
               <p className="truncate text-xs text-muted-foreground">{documento.mimeType || "Tipo de ficheiro não informado"}</p>
             </div>
           </div>
         )}
-        {isImageUri(documento.uri, documento.mimeType) && (
-          <p className="mt-2 truncate text-xs text-muted-foreground">{documento.name || label}</p>
-        )}
+
+        <div className="flex items-center justify-between gap-3 border-t border-border bg-background p-3">
+          <p className="truncate text-xs text-muted-foreground">{documento.name || label}</p>
+          {isUsableUri(uri) ? (
+            <div className="flex items-center gap-2">
+              <a
+                href={uri}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Abrir
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              <a
+                href={uri}
+                download={documento.name || label}
+                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:underline"
+              >
+                Download
+              </a>
+            </div>
+          ) : (
+            <span className="text-right text-xs text-muted-foreground">Sem ficheiro</span>
+          )}
+        </div>
       </div>
-      {isUsableUri(documento.uri) ? (
-        <a
-          href={documento.uri}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-        >
-          Abrir
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      ) : (
-        <span className="shrink-0 text-right text-xs text-muted-foreground">
-          {documento.uri ? "Anexo indisponível" : "Sem ficheiro"}
-        </span>
-      )}
-    </div>
-  )
+    )
+  }
 
   return (
     <>

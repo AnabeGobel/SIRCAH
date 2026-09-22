@@ -1,6 +1,7 @@
 "use client"
 
-import { Eye, Check, X, Power } from "lucide-react"
+import Link from "next/link"
+import { Eye, Check, X, Power, ExternalLink } from "lucide-react"
 import { StatusBadge } from "./status-badge"
 import { Button } from "@/components/ui/button"
 import type { ResidenceDocument } from "./residence-documents"
@@ -152,6 +153,9 @@ export function ResidencesTable({
                       <Eye className="h-4 w-4 text-muted-foreground" />
                       <span className="sr-only">Ver detalhes</span>
                     </Button>
+                    <Link href={`/residencias/${residence.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted" aria-label="Ver detalhes completos">
+                      <ExternalLink className="h-4 w-4 text-primary" />
+                    </Link>
                     <Button
                       variant="ghost"
                       size="sm"

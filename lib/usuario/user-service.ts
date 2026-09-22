@@ -14,7 +14,7 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
 export const cadastrarUsuarioWeb = async (dados: any) => {
   const emailOriginal = dados.email.trim().toLowerCase();
-  const funcaoLimpa = dados.funcao.trim();
+  const funcaoLimpa = String(dados.funcao ?? "").trim().toLowerCase();
   let uid = "";
   let secondaryApp = null;
   let usuarioJaExisteNoSistema = false;
@@ -52,6 +52,13 @@ export const cadastrarUsuarioWeb = async (dados: any) => {
           dados.senha
         );
         uid = userCredential.user.uid;
+
+        // Importante: não manter a conta recém-criada como utilizador activo
+        // no Auth da app secundária; isto evita que a sessão do administrador
+        // seja trocada para a conta criada durante o cadastro.
+        if (secondaryAuth.currentUser) {
+          await secondaryAuth.signOut();
+        }
       } catch (authError: any) {
         if (authError.code === "auth/email-already-in-use") {
           throw new Error("Este e-mail já existe na Autenticação, mas não foi encontrado em nenhuma das coleções mapeadas do Firestore.");

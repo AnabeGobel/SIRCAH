@@ -274,10 +274,11 @@ export default function DashboardPage() {
 
     try {
       await rejeitarResidencia(pendingAction.id, reason)
+      toast.success("Residência rejeitada com sucesso.")
       await carregarDadosDashboard()
     } catch (error) {
       console.error("Erro ao rejeitar residência:", error)
-      alert("Falha ao rejeitar o registo.")
+      toast.error("Falha ao rejeitar o registo. Verifique o motivo e tente novamente.")
     } finally {
       setShowRejectModal(false)
       setSelectedResidence(null)

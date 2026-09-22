@@ -6,8 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NewUserModal } from "@/components/new-user-modal"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
 import { db, auth } from "@/lib/Services/firebaseConfig"
-import { collection, onSnapshot, query, where } from "firebase/firestore"
+import { collection, deleteDoc, doc, onSnapshot, query, where, type Unsubscribe } from "firebase/firestore"
 
 type FilterType = "todos" | "administradores" | "agentes"
 
@@ -19,6 +30,25 @@ interface User {
   funcao: "administrador" | "agente" | "visualizador"
   ultimoAcesso: string
   estado: "ativo" | "inativo"
+}
+
+const normalizeRole = (value: unknown): User["funcao"] => {
+  const normalizedValue = String(value ?? "").trim().toLowerCase()
+
+  if (["administrador", "admin", "administrador web", "administradorweb", "superadmin", "super-admin"].includes(normalizedValue)) {
+    return "administrador"
+  }
+
+  if (["agente", "agent", "operador", "operador de campo"].includes(normalizedValue)) {
+    return "agente"
+  }
+
+  return "visualizador"
+}
+
+const normalizeState = (value: unknown): User["estado"] => {
+  const normalizedValue = String(value ?? "").trim().toLowerCase()
+  return ["ativo", "active", "enabled", "activa", "online"].includes(normalizedValue) ? "ativo" : "inativo"
 }
 
 const roleLabels: Record<User["funcao"], string> = {
@@ -37,51 +67,91 @@ export default function UsersPage() {
   const [filter, setFilter] = useState<FilterType>("todos")
   const [searchQuery, setSearchQuery] = useState("")
   const [showNewUserModal, setShowNewUserModal] = useState(false)
+  const [showEditUserModal, setShowEditUserModal] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [userToEdit, setUserToEdit] = useState<User | null>(null)
 
   useEffect(() => {
-    let unsubscribeProfile: () => void = () => {}
-    let unsubscribeUsers: () => void = () => {}
+    let unsubscribeProfile: Unsubscribe = () => {}
 
     const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
       unsubscribeProfile()
-      unsubscribeUsers()
+
       if (!currentUser) {
         setIsAdmin(false)
         setIsLoading(false)
         return
       }
 
-      const profileQuery = query(collection(db, "usuariosWeb"), where("uid", "==", currentUser.uid))
-      unsubscribeProfile = onSnapshot(profileQuery, (snapshot) => {
-        const userData = snapshot.empty ? null : snapshot.docs[0].data()
-        setIsAdmin(userData?.funcao?.trim() === "administrador")
+      const resolveAdminProfile = (profileData: Record<string, unknown> | null) => {
+        const role = profileData ? normalizeRole(profileData.funcao ?? profileData.role ?? profileData.perfil) : "visualizador"
+        setIsAdmin(role === "administrador")
         setIsLoading(false)
+      }
+
+      unsubscribeProfile = onSnapshot(doc(db, "usuariosWeb", currentUser.uid), (snapshot) => {
+        if (snapshot.exists()) {
+          resolveAdminProfile(snapshot.data())
+          return
+        }
+
+        const fallbackQuery = query(collection(db, "usuariosWeb"), where("uid", "==", currentUser.uid))
+        const fallbackUnsubscribe = onSnapshot(fallbackQuery, (fallbackSnapshot) => {
+          const profileData = fallbackSnapshot.empty ? null : fallbackSnapshot.docs[0]?.data() ?? null
+          resolveAdminProfile(profileData)
+        }, (error) => {
+          console.error("Erro ao ler perfil do administrador:", error)
+          setIsAdmin(false)
+          setIsLoading(false)
+        })
+
+        unsubscribeProfile = () => {
+          fallbackUnsubscribe()
+        }
       }, (error) => {
         console.error("Erro ao ler perfil do administrador:", error)
-        setIsAdmin(false)
-        setIsLoading(false)
+        const fallbackQuery = query(collection(db, "usuariosWeb"), where("uid", "==", currentUser.uid))
+        const fallbackUnsubscribe = onSnapshot(fallbackQuery, (fallbackSnapshot) => {
+          const profileData = fallbackSnapshot.empty ? null : fallbackSnapshot.docs[0]?.data() ?? null
+          resolveAdminProfile(profileData)
+        }, (fallbackError) => {
+          console.error("Erro ao consultar perfil do administrador por UID:", fallbackError)
+          setIsAdmin(false)
+          setIsLoading(false)
+        })
+
+        unsubscribeProfile = () => {
+          fallbackUnsubscribe()
+        }
       })
     })
 
-      unsubscribeUsers = onSnapshot(collection(db, "usuariosWeb"), (snapshot) => {
-        setUsers(snapshot.docs.map((doc) => {
-          const data = doc.data()
-          return {
-            id: doc.id,
-            nome: data.nome || "",
-            email: data.email || "",
-            telefone: data.telefone || "",
-            funcao: data.funcao || "visualizador",
-            ultimoAcesso: data.ultimoAcesso || "Nunca",
-            estado: data.estado || "ativo",
-          } as User
-        }))
-      }, (error) => {
-        if (auth.currentUser) console.error("Erro ao listar utilizadores:", error)
-      })
+    // Listener independente do ciclo de vida da autenticação: só é criado uma
+    // vez e só é cancelado quando o componente desmonta (ver cleanup abaixo).
+    // Antes, este listener era cancelado dentro do onAuthStateChanged sempre
+    // que o estado de auth mudava, o que apagava a lista de utilizadores.
+    const unsubscribeUsers = onSnapshot(collection(db, "usuariosWeb"), (snapshot) => {
+      setUsers(snapshot.docs.map((docSnapshot) => {
+        const data = docSnapshot.data() as Record<string, unknown>
+        const role = normalizeRole(data.funcao ?? data.role ?? data.perfil)
+
+        return {
+          id: docSnapshot.id,
+          nome: String(data.nome || data.name || "Sem nome"),
+          email: String(data.email || ""),
+          telefone: String(data.telefone || data.phone || ""),
+          funcao: role,
+          ultimoAcesso: String(data.ultimoAcesso || data.lastLogin || data.ultimo_acesso || "Nunca"),
+          estado: normalizeState(data.estado ?? data.status),
+        } as User
+      }))
+    }, (error) => {
+      console.error("Erro ao listar utilizadores:", error)
+    })
 
     return () => {
       unsubscribeAuth()
@@ -95,6 +165,50 @@ export default function UsersPage() {
     const term = searchQuery.toLowerCase()
     return matchesFilter && (!term || user.nome.toLowerCase().includes(term) || user.email.toLowerCase().includes(term))
   })
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
+
+    if (auth.currentUser?.uid === userToDelete.id) {
+      toast.error("Não pode eliminar a sua própria conta de administrador.")
+      setUserToDelete(null)
+      return
+    }
+
+    setIsDeleting(true)
+
+    try {
+      const token = await auth.currentUser?.getIdToken()
+
+      if (!token) {
+        throw new Error("Sessão expirada. Faça login novamente.")
+      }
+
+      const response = await fetch("/api/auth/remover-utilizador", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid: userToDelete.id }),
+      })
+
+      const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Não foi possível remover este utilizador.")
+      }
+
+      toast.success(payload?.message || "Utilizador removido com sucesso.")
+      setUsers((currentUsers) => currentUsers.filter((user) => user.id !== userToDelete.id))
+    } catch (error) {
+      console.error("Erro ao remover utilizador:", error)
+      toast.error(error instanceof Error ? error.message : "Não foi possível remover este utilizador.")
+    } finally {
+      setUserToDelete(null)
+      setIsDeleting(false)
+    }
+  }
 
   if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-background text-sm font-medium text-muted-foreground">A verificar permissões no SIRCAH...</div>
   if (!isAdmin) return <div className="flex min-h-screen items-center justify-center bg-background p-8 text-center"><div className="max-w-md space-y-2"><h2 className="text-xl font-semibold text-foreground">Acesso Negado</h2><p className="text-sm text-muted-foreground">Esta área é restrita para contas de administrador do sistema web.</p></div></div>
@@ -113,11 +227,36 @@ export default function UsersPage() {
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-border"><Table className="min-w-[700px]"><TableHeader><TableRow className="border-border bg-card hover:bg-transparent"><TableHead className="px-6 py-4">Utilizador</TableHead><TableHead>Função</TableHead><TableHead>Último Acesso</TableHead><TableHead>Estado</TableHead><TableHead className="px-6 text-right">Ações</TableHead></TableRow></TableHeader><TableBody>
-          {filteredUsers.map((user) => <TableRow key={user.id} className="border-border transition-colors hover:bg-muted/50"><TableCell className="px-6 py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-primary/10 text-sm font-semibold text-primary shadow-sm">{user.nome.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2)}</div><div><p className="text-sm font-medium text-foreground">{user.nome}</p><p className="text-xs text-muted-foreground">{user.email}</p></div></div></TableCell><TableCell><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleColors[user.funcao]}`}>{roleLabels[user.funcao]}</span></TableCell><TableCell className="text-sm text-muted-foreground">{user.ultimoAcesso}</TableCell><TableCell><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.estado === "ativo" ? "bg-emerald-500/10 text-emerald-600" : "bg-gray-500/10 text-gray-500"}`}>{user.estado === "ativo" ? "Ativo" : "Inativo"}</span></TableCell><TableCell className="px-6"><div className="flex justify-end gap-2"><Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted"><Pencil className="h-4 w-4 text-muted-foreground" /><span className="sr-only">Editar</span></Button><Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10"><Trash2 className="h-4 w-4 text-destructive" /><span className="sr-only">Eliminar</span></Button></div></TableCell></TableRow>)}
+          {filteredUsers.map((user) => <TableRow key={user.id} className="border-border transition-colors hover:bg-muted/50"><TableCell className="px-6 py-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-primary/10 text-sm font-semibold text-primary shadow-sm">{user.nome.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2)}</div><div><p className="text-sm font-medium text-foreground">{user.nome}</p><p className="text-xs text-muted-foreground">{user.email}</p></div></div></TableCell><TableCell><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${roleColors[user.funcao]}`}>{roleLabels[user.funcao]}</span></TableCell><TableCell className="text-sm text-muted-foreground">{user.ultimoAcesso}</TableCell><TableCell><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.estado === "ativo" ? "bg-emerald-500/10 text-emerald-600" : "bg-gray-500/10 text-gray-500"}`}>{user.estado === "ativo" ? "Ativo" : "Inativo"}</span></TableCell><TableCell className="px-6"><div className="flex justify-end gap-2"><Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted" onClick={() => { setUserToEdit(user); setShowEditUserModal(true) }}><Pencil className="h-4 w-4 text-muted-foreground" /><span className="sr-only">Editar</span></Button><Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-destructive/10" onClick={() => setUserToDelete(user)}><Trash2 className="h-4 w-4 text-destructive" /><span className="sr-only">Eliminar</span></Button></div></TableCell></TableRow>)}
         </TableBody></Table></div>
         {filteredUsers.length === 0 && <p className="p-8 text-center text-sm text-muted-foreground">Nenhum utilizador encontrado.</p>}
       </div>
-      <NewUserModal isOpen={showNewUserModal} onClose={() => setShowNewUserModal(false)} />
+      <AlertDialog open={Boolean(userToDelete)} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover utilizador</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem a certeza que pretende remover <span className="font-semibold text-foreground">{userToDelete?.nome}</span> do sistema? Esta ação não pode ser anulada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={isDeleting} onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? "A remover..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <NewUserModal
+        isOpen={showNewUserModal || showEditUserModal}
+        onClose={() => {
+          setShowNewUserModal(false)
+          setShowEditUserModal(false)
+          setUserToEdit(null)
+        }}
+        mode={showEditUserModal ? "edit" : "create"}
+        user={userToEdit ?? undefined}
+      />
     </div>
   )
 }

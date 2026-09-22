@@ -7,6 +7,7 @@ import { ChangeStatusModal } from "@/components/change-status-modal"
 import { Bell, Search, Plus, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NotificationBell } from "@/components/notification-bell"
+import { toast } from "sonner"
 
 export default function TodasResidenciasPage() {
   const [residences, setResidences] = useState<Residence[]>([])
@@ -69,11 +70,12 @@ export default function TodasResidenciasPage() {
     if (!statusAction) return
     try {
       await alterarEstadoResidencia(statusAction.residence.id, statusAction.nextState, message)
+      toast.success(statusAction.nextState === "valido" ? "Residência validada com sucesso." : "Residência marcada como inválida com sucesso.")
       setStatusAction(null)
       await carregarTodas()
     } catch (error) {
       console.error("Erro ao alterar estado da residência:", error)
-      alert(error instanceof Error ? error.message : "Falha ao alterar o estado da residência.")
+      toast.error(error instanceof Error ? error.message : "Falha ao alterar o estado da residência.")
     }
   }
 

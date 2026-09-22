@@ -1,9 +1,10 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import { StatusBadge } from "@/components/status-badge"
-import { MapPin, Layers, Search, X, Loader2, AlertCircle } from "lucide-react"
+import { MapPin, Layers, Search, X, Loader2, AlertCircle, ExternalLink } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -284,7 +285,13 @@ export default function MapaPage() {
                   </p>
                 )}
 
-                <Button className="w-full rounded-xl">Ver Detalhes Completos</Button>
+                <Link
+                  href={`/residencias/${selectedResidence.id}`}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Ver Detalhes Completos
+                </Link>
               </div>
             </div>
           )}

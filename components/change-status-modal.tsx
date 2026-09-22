@@ -12,22 +12,33 @@ type ResidenceState = "valido" | "invalido"
 interface ChangeStatusModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (message: string) => void
+  onConfirm: (message: string) => Promise<void> | void
   residenceCode: string
   nextState: ResidenceState
 }
 
 export function ChangeStatusModal({ isOpen, onClose, onConfirm, residenceCode, nextState }: ChangeStatusModalProps) {
   const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
   const isValid = nextState === "valido"
 
   useEffect(() => {
-    if (!isOpen) setMessage("")
+    if (!isOpen) {
+      setMessage("")
+      setError("")
+    }
   }, [isOpen])
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const normalizedMessage = message.trim()
-    if (normalizedMessage) onConfirm(normalizedMessage)
+
+    if (!normalizedMessage) {
+      setError("É obrigatório indicar o motivo da validação ou invalidação da residência.")
+      return
+    }
+
+    setError("")
+    await onConfirm(normalizedMessage)
   }
 
   return (
@@ -55,9 +66,13 @@ export function ChangeStatusModal({ isOpen, onClose, onConfirm, residenceCode, n
               id="status-message"
               placeholder="Explique o motivo da alteração do estado..."
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value)
+                if (error) setError("")
+              }}
               className="min-h-[120px] rounded-xl resize-none bg-muted/30 border-border focus:border-primary"
             />
+            {error && <p className="text-xs font-medium text-destructive">{error}</p>}
           </div>
 
           <div className="flex gap-3">
@@ -67,7 +82,6 @@ export function ChangeStatusModal({ isOpen, onClose, onConfirm, residenceCode, n
             <Button
               className={`flex-1 h-11 rounded-xl text-white ${isValid ? "bg-status-approved hover:bg-status-approved/90" : "bg-status-rejected hover:bg-status-rejected/90"}`}
               onClick={handleConfirm}
-              disabled={!message.trim()}
             >
               Confirmar alteração
             </Button>
